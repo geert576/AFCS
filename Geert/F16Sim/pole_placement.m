@@ -33,7 +33,7 @@ D_sp = D([2 4]);
 I = eye(2);
 K = [K_a,K_q];
 
-sys = ss(A_sp,B_sp,C_sp,D_sp);
+sys = ss(A_sp_uncontrolled,B_sp,C_sp,D_sp);
 % sys_q = sys(2);
 
 %Determine the poles of these state space systems
@@ -60,16 +60,19 @@ pole_required = solve(x^2 + 2*wn_req*damp_req*x + wn_req^2)
 
 % Instert poles in characteristic equation, solve for k_a and k_q
 charact_equation = subs(charact_equation, s, pole_required(1));
-S = solve(charact_equation,K_a, K_q)
-result_K_a = double(real(S.K_a)) 
-impart_K_a = double(imag(S.K_a))
-result_K_q = double(real(S.K_q)) 
-impart_K_q = double(imag(S.K_q))
+S = solve(charact_equation,K_a, K_q);
+result_K_a = double(real(S.K_a)) ;
+impart_K_a = double(imag(S.K_a));
+result_K_q = double(real(S.K_q)) ;
+impart_K_q = double(imag(S.K_q));
 
 % Rewrite results
 K = [result_K_a + impart_K_a*i,result_K_q + impart_K_q*i];
+K2 = [-190.9711, -26.4884];
 
 % Determine properties of system with controller
-A_controlled = (A_sp_uncontrolled - B_sp*K);
+A_controlled = (A_sp_uncontrolled - B_sp*K2);
 sys = ss(A_controlled,B_sp,C_sp,D_sp);
 damp(sys)
+p = [-2.7432 + 4.7514*1i, -2.7432 - 4.7514*1i];
+place(A_sp_uncontrolled,B_sp,p);

@@ -21,8 +21,10 @@ newline = sprintf('\n');
 %%
 %altitude = input('Enter the altitude for the simulation (ft)  :  ');
 %velocity = input('Enter the velocity for the simulation (ft/s):  ');
-altitude = 20000; % [ft] 20000ft
-velocity = 600; % [ft/s] 600ft/s
+
+altitude = 20000; % [ft]
+velocity = 600; % [ft/s]
+
 xa = 15*0.3048; % distance accelerometer forward of c.g. [m]
 gd = 9.80665; % gravity constant [m/s^2]
 %% Initial guess for trim
@@ -153,6 +155,7 @@ C_long = SS_long_lo.C([3 4 2 5],[3 4 2 5]); % output all states
 D_long = SS_long_lo.D([3 4 2 5], 2); % 4x1 vector of zeros
 SS_long_std = ss(A_long, B_long, C_long, D_long);
 
+
 %% Create lateral SS system
 
 A_lat = SS_lat_lo.A([4 1 5 6],[4 1 5 6]);
@@ -161,186 +164,200 @@ C_lat = SS_lat_lo.C([4 1 5 6],[4 1 5 6]);
 D_lat = SS_lat_lo.D([4 1 5 6],[2 3]);
 SS_lat_std = ss(A_lat, B_lat, C_lat, D_lat);
 
-%% Bode plots we don't use
-%{
-clc;
+%% Longitudinal open-loop analysis
+lambda_longitudinal = eig(A_long);
+lambda_sp = lambda_longitudinal(1);
+w0_sp = abs(lambda_sp);
+zeta_sp = -real(lambda_sp)/w0_sp;
+wn_sp = w0_sp*sqrt(1-zeta_sp^2);
 
-disp(sprintf('Altitude: %.3f ft.', altitude));
-disp(sprintf('Velocity: %.3f ft/s\n\n', velocity));
+lambda_phug = lambda_longitudinal(3);
+w0_phug = abs(lambda_phug);
+zeta_phug = -real(lambda_phug)/w0_phug;
+wn_phug = w0_phug*sqrt(1-zeta_phug^2);
 
-disp('For HIFI Model:  ');
-disp('Longitudal Direction:  ');
-disp(newline);
+%% simulate phugoid/short_period response
+p1 = 10; %sec, breakpoint 1
+p2 = 30; %sec, breakpoint 2
+p3 = 700; %sec, endtime
+dt = 0.001;
 
-disp('A =')
-for i=1:length( A_longitude_hi(:,1) )
-    mprintf([ A_longitude_hi(i,:) ],'  %.3e ')
-end %for
+t = 0:dt:p3; %sec, time vector]
+u1 = zeros(1,p1/dt);
+u2 = 0.2*ones(1,p2/dt);
+u3 = zeros(1,(p3-p2-p1+dt)/dt);
 
-disp('B =')
-for i=1:length( B_longitude_hi(:,1) )
-    mprintf([ B_longitude_hi(i,:) ],'  %.3e ')
-end %for
+u = cat(2,u1,u2,u3); % concatenate input signal
+trim_cond = [600 3.4044 3.4044 0]; % V, alpha, theta, pitchrate
 
-disp('C =')
-for i=1:length( C_longitude_hi(:,1) )
-    mprintf([ C_longitude_hi(i,:) ],'  %.3e ')
-end %for
+phug_data = lsim(SS_long_std,u,t); % zero initial conditions
+axis_fontsize = 18; %like x-axis numbers
+legend_fontsize = 22;
+lwdth = 2;
+lblsize = 22; % [deg] indicator 
+figure(1)
 
-disp('D =')
-for i=1:length( D_longitude_hi(:,1) )
-    mprintf([ D_longitude_hi(i,:) ],'  %.3e ')
-end %for
+subplot(5,1,1)
 
-rifd(long_poles_hi)
+plot(t,u,'g','LineWidth',lwdth)
+set(gca,'FontSize',axis_fontsize)
+grid on
+legend('$\delta_e$','Interpreter','latex','FontSize',legend_fontsize)
 
-disp(newline);
+ylabel('[deg]','FontSize',lblsize)
 
-disp('Lateral Direaction:  ');
+subplot(5,1,2)
+plot(t,phug_data(:,1)+trim_cond(1),'c','LineWidth',lwdth)
+set(gca,'FontSize',axis_fontsize)
+grid on
+legend('$V$','Interpreter','latex','FontSize',legend_fontsize)
+ylabel('[ft/s]','FontSize',lblsize)
 
-disp(newline);
+subplot(5,1,3)
+plot(t,phug_data(:,2)+trim_cond(2),'m','LineWidth',lwdth)
+set(gca,'FontSize',axis_fontsize)
+grid on
+legend('$\alpha$','Interpreter','latex','FontSize',legend_fontsize)
+ylabel('[deg]','FontSize',lblsize)
 
-disp('A =')
-for i=1:length( A_lateral_hi(:,1) )
-    mprintf([ A_lateral_hi(i,:) ],'  %.3e ')
-end %for
 
-disp('B =')
-for i=1:length( B_lateral_hi(:,1) )
-    mprintf([ B_lateral_hi(i,:) ],'  %.3e ')
-end %for
+subplot(5,1,4)
+plot(t,phug_data(:,3)+trim_cond(3),'m','LineWidth',lwdth)
+set(gca,'FontSize',axis_fontsize)
+grid on
+legend('$\theta$','Interpreter','latex','FontSize',legend_fontsize)
+ylabel('[deg]','FontSize',lblsize)
 
-disp('C =')
-for i=1:length( C_lateral_hi(:,1) )
-    mprintf([ C_lateral_hi(i,:) ],'  %.3e ')
-end %for
 
-disp('D =')
-for i=1:length( D_lateral_hi(:,1) )
-    mprintf([ D_lateral_hi(i,:) ],'  %.3e ')
-end %for
+subplot(5,1,5)
+plot(t,phug_data(:,4)+trim_cond(4),'LineWidth',lwdth)
+set(gca,'FontSize',axis_fontsize)
+grid on
+legend('$q$','Interpreter','latex','FontSize',legend_fontsize)
+ylabel('[deg/s]','FontSize',lblsize)
+xlabel('Time [s]','FontSize',lblsize)
 
-rifd(lat_poles_hi)
+sgtitle('Phugoid')
 
-disp(newline);
-disp(newline);
-disp('For LOFI Model:  ');
-disp('Longitudal Direction:  ');
-disp(newline);
+%% Lateral open-loop analysis
+lambda_lateral = eig(A_lat); %extract the eigenvalues
 
-disp('A =')
-for i=1:length( A_longitude_lo(:,1) )
-    mprintf([ A_longitude_lo(i,:) ],'  %.3e ')
-end %for
+lambda_droll = lambda_lateral(1);
+w0_droll = abs(lambda_droll);
+zeta_droll = -real(lambda_droll)/w0_droll;
+wn_droll = w0_droll*sqrt(1-zeta_droll^2);
+P_droll = 2*pi/wn_droll;
+T12_droll = log(0.5)/real(lambda_droll);
+Tau_droll = -1/real(lambda_droll);
 
-disp('B =')
-for i=1:length( B_longitude_lo(:,1) )
-    mprintf([ B_longitude_lo(i,:) ],'  %.3e ')
-end %for
+lambda_aproll = lambda_lateral(3);
+P_aproll = 2*pi/real(-lambda_aproll);
+T12_aproll = log(0.5)/real(lambda_aproll);
+Tau_aproll = -1/real(lambda_aproll)
 
-disp('C =')
-for i=1:length( C_longitude_lo(:,1) )
-    mprintf([ C_longitude_lo(i,:) ],'  %.3e ')
-end %for
+lambda_spiral = lambda_lateral(4);
+P_spiral = 2*pi/real(-lambda_spiral);
+T12_spiral = log(0.5)/real(lambda_spiral);
+Tau_spiral = -1/real(lambda_spiral)
 
-disp('D =')
-for i=1:length( D_longitude_lo(:,1) )
-    mprintf([ D_longitude_lo(i,:) ],'  %.3e ')
-end %for
+%% simulate Dutch roll / aperiodic roll / spiral
 
-% Display the real, imaginary, frequency (magnitude) and damping ratios
-rifd(long_poles_lo)
-
-disp(newline);
-
-disp('Lateral Direaction:  ');
-
-disp(newline);
-
-disp('A =')
-for i=1:length( A_lateral_lo(:,1) )
-    mprintf([ A_lateral_lo(i,:) ],'  %.3e ')
-end %for
-
-disp('B =')
-for i=1:length( B_lateral_lo(:,1) )
-    mprintf([ B_lateral_lo(i,:) ],'  %.3e ')
-end %for
-
-disp('C =')
-for i=1:length( C_lateral_lo(:,1) )
-    mprintf([ C_lateral_lo(i,:) ],'  %.3e ')
-end %for
-
-disp('D =')
-for i=1:length( D_lateral_lo(:,1) )
-    mprintf([ D_lateral_lo(i,:) ],'  %.3e ')
-end %for
-
-% Display the real, imaginary, frequency (magnitude) and damping ratios
-rifd(lat_poles_lo)
-
-%% All Poles
-figure(1); 
-pzmap(SS_hi, 'r', SS_lo, 'b');
-title_string = sprintf('Altitude = %.2f ft Velocity = %.2f ft/s\nAll Poles\n Blue = lofi Red = hifi.', altitude, velocity);
-title(title_string);
-sgrid;
-
-%% Long. Poles
-%%
-figure(2); 
-pzmap(SS_long_hi, 'r', SS_long_lo, 'b');
-title_string = sprintf('Altitude = %.2f ft Velocity = %.2f ft/s\nLongitudal Directional Poles\n Blue = lofi Red = hifi.', altitude, velocity);
-title(title_string);
-sgrid;
-
-%% Lat. Poles
-%%
-figure(3); 
-pzmap(SS_lat_hi, 'r', SS_lat_lo, 'b');
-title_string = sprintf('Altitude = %.2f ft Velocity = %.2f ft/s\nLateral Directional Poles\n Blue = lofi Red = hifi.', altitude, velocity);
-title(title_string);
-sgrid;
-
-% Create Bode Plots
-
-omega = logspace(-2,2,100);
-
-sysg_lat_hi = frsp(sys_lat_hi,omega);
-sysg_lat_lo = frsp(sys_lat_lo,omega);
-
-sysg_long_hi = frsp(sys_long_hi,omega);
-sysg_long_lo = frsp(sys_long_lo,omega);
-
-figure;
-BodeCount = 0;
-for state = 1:1:5
-    for control = 1:1:2
-        BodeCount = BodeCount +1;
-        title_string = sprintf('Bode Plot #%d\n State = %d\n Control = %d', BodeCount,state,control);
-        vplot('bode', sel(sysg_long_hi,state,control), 'b--', sel(sysg_long_lo,state,control), 'r');
-        disp(title_string);
-        legend('hifi', 'lofi');
-        pause;
-    end
+a = 2; %1 = dutch roll, 2 = aperiodic roll, 3 = spiral
+switch a
+    case 1
+        p1 = 1; %sec, time pulse starts
+        p2 = 0.5; %sec, time it is doing the pulse
+        p3 = 15; %sec, endtime
+        dt = 0.001;
+        
+        t = 0:dt:p3; %sec, time vector]
+        u1 = zeros(1,p1/dt);
+        u2 = 1.5*ones(1,p2/dt);
+        u4 = -1.5*ones(1,p2/dt); %for creating the doublet, works better for dutch roll
+        u3 = zeros(1,(p3-2*p2-p1+dt)/dt);
+        u = cat(2,u1,u2,u4,u3); % concatenate input signal
+        u_zero = zeros(1,length(u));
+        u = cat(1,u_zero,u);
+        
+    case 2
+        p1 = 1; %sec, time pulse starts
+        p2 = 1; %sec, time it is doing the pulse
+        p3 = 20; %sec, endtime
+        dt = 0.001;
+        t = 0:dt:p3; %sec, time vector]
+        u1 = zeros(1,p1/dt);
+        u2 = 1.5*ones(1,p2/dt);
+        u3 = zeros(1,(p3-p2-p1+dt)/dt);
+        u = cat(2,u1,u2,u3); % concatenate input signal
+        u_zero = zeros(1,length(u));
+        u = cat(1,u,u_zero);   
+        
+    case 3
+        p1 = 1; %sec, time pulse starts
+        p2 = 1; %sec, time it is doing the pulse
+        p3 = 200; %sec, endtime
+        dt = 0.001;
+        t = 0:dt:p3; %sec, time vector]
+        u1 = zeros(1,p1/dt);
+        u2 = 1.5*ones(1,p2/dt);
+        u3 = zeros(1,(p3-p2-p1+dt)/dt);
+        u = cat(2,u1,u2,u3); % concatenate input signal
+        u_zero = zeros(1,length(u));
+        u = cat(1,u,u_zero);
 end
 
-for state = 1:1:6
-    for control = 1:1:3
-        BodeCount = BodeCount + 1;
-        title_string = sprintf('Bode Plot #%d\n State = %d\n Control = %d', BodeCount,state,control);
-        vplot('bode', sel(sysg_lat_hi,state,control), 'b--', sel(sysg_lat_lo,state,control), 'r');
-        disp(title_string);
-        legend('hifi', 'lofi');
-        pause;
-    end
-end
+trim_cond = [0 0 0 0]; % beta, phi, p, r (all zero obviously, wings-level steady flight..
 
-%}
+asym_data = lsim(SS_lat_std,u,t); % zero initial conditions
+axis_fontsize = 18; %like x-axis numbers
+legend_fontsize = 22;
+lwdth = 2;
+lblsize = 22; % [deg] indicator 
+figure(1)
+set(gcf,'renderer','Painters')
+subplot(6,1,1)
+plot(t,u(1,:),'g','LineWidth',lwdth)
+set(gca,'FontSize',axis_fontsize)
+grid on
+legend('$\delta_a$','Interpreter','latex','FontSize',legend_fontsize)
+ylabel('[deg]','FontSize',lblsize)
 
-%% testing
-%time = 0:0.01:15-0.01;
-%u = ones(1,1500);
+subplot(6,1,2)
+plot(t,u(2,:),'g','LineWidth',lwdth)
+set(gca,'FontSize',axis_fontsize)
+grid on
+legend('$\delta_r$','Interpreter','latex','FontSize',legend_fontsize)
+ylabel('[deg]','FontSize',lblsize)
 
-%lsim(SS_long_std,u,time,zeros(4).T)
+subplot(6,1,3)
+plot(t,asym_data(:,1)+trim_cond(1),'m','LineWidth',lwdth)
+set(gca,'FontSize',axis_fontsize)
+grid on
+legend('$\beta$','Interpreter','latex','FontSize',legend_fontsize)
+ylabel('[deg]','FontSize',lblsize)
+
+subplot(6,1,4)
+plot(t,asym_data(:,2)+trim_cond(2),'m','LineWidth',lwdth)
+set(gca,'FontSize',axis_fontsize)
+grid on
+legend('$\phi$','Interpreter','latex','FontSize',legend_fontsize)
+ylabel('[deg]','FontSize',lblsize)
+
+
+subplot(6,1,5)
+plot(t,asym_data(:,3)+trim_cond(3),'LineWidth',lwdth)
+set(gca,'FontSize',axis_fontsize)
+grid on
+legend('$p$','Interpreter','latex','FontSize',legend_fontsize)
+ylabel('[deg/s]','FontSize',lblsize)
+
+
+subplot(6,1,6)
+plot(t,asym_data(:,4)+trim_cond(4),'LineWidth',lwdth)
+set(gca,'FontSize',axis_fontsize)
+grid on
+legend('$r$','Interpreter','latex','FontSize',legend_fontsize)
+ylabel('[deg/s]','FontSize',lblsize)
+xlabel('Time [s]','FontSize',lblsize)
+
+sgtitle('Aperiodic Roll')

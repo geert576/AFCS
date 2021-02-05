@@ -21,7 +21,7 @@ newline = sprintf('\n');
 %%
 %altitude = input('Enter the altitude for the simulation (ft)  :  ');
 %velocity = input('Enter the velocity for the simulation (ft/s):  ');
-
+% our flight condition: 20000ft and 600 ft/s 
 altitude = 20000; % [ft]
 velocity = 600; % [ft/s]
 
@@ -177,9 +177,9 @@ zeta_phug = -real(lambda_phug)/w0_phug;
 wn_phug = w0_phug*sqrt(1-zeta_phug^2);
 
 %% simulate phugoid/short_period response
-p1 = 10; %sec, breakpoint 1
-p2 = 30; %sec, breakpoint 2
-p3 = 700; %sec, endtime
+p1 = 0; %sec, breakpoint 1
+p2 = 25; %sec, breakpoint 2
+p3 = 25; %sec, endtime
 dt = 0.001;
 
 t = 0:dt:p3; %sec, time vector]
@@ -196,6 +196,7 @@ legend_fontsize = 22;
 lwdth = 2;
 lblsize = 22; % [deg] indicator 
 figure(1)
+set(gcf,'renderer','Painters')
 
 subplot(5,1,1)
 
@@ -237,7 +238,7 @@ legend('$q$','Interpreter','latex','FontSize',legend_fontsize)
 ylabel('[deg/s]','FontSize',lblsize)
 xlabel('Time [s]','FontSize',lblsize)
 
-sgtitle('Phugoid')
+sgtitle('Short Period')
 
 %% Lateral open-loop analysis
 lambda_lateral = eig(A_lat); %extract the eigenvalues
@@ -313,7 +314,7 @@ axis_fontsize = 18; %like x-axis numbers
 legend_fontsize = 22;
 lwdth = 2;
 lblsize = 22; % [deg] indicator 
-figure(1)
+figure(2)
 set(gcf,'renderer','Painters')
 subplot(6,1,1)
 plot(t,u(1,:),'g','LineWidth',lwdth)
